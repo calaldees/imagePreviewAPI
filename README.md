@@ -55,8 +55,24 @@ https://www.iana.org/assignments/media-type-structured-suffix/media-type-structu
 ```bash
 alias ffmpeg='docker run -i --rm --volume $(PWD):/data/ --workdir=/data/ linuxserver/ffmpeg'
 
-cat test2.png | ffmpeg -i - -c:v libaom-av1 -filter:v scale=200:200 -crf 45 -pix_fmt yuv420p -y test2.avif | base64
+
+# Can't use tempfile/mktemp because the docker mount is only the current directory
+#   on a local system we can probably use tempfile/mktemp
+# TEMPFILE="$(gmktemp --suffix=.avif)" && \
 
 
-echo "data:image/avif;base64,$(wget -q "https://placecats.com/neo/300/200" -O -  | ffmpeg -hide_banner -loglevel error -i - -c:v libaom-av1 -filter:v scale=200:-2 -crf 45 -pix_fmt yuv420p -y temp.avif && cat temp.avif |  base64)" && rm temp.avif
+URL_IMAGE="https://placecats.com/neo/300/200" && \
+TEMPFILE="$(openssl rand -hex 3).avif" && \
+BASE64_IMAGE=$( \
+    wget -q "${URL_IMAGE}" -O - \
+    | ffmpeg \
+        -hide_banner -loglevel error \
+        -i - \
+        -c:v libaom-av1 -filter:v scale=200:-2 -crf 45 -pix_fmt yuv420p \
+        ${TEMPFILE} \
+    && cat ${TEMPFILE} \
+    | base64 \
+) \
+&& echo "data:image/avif;base64,${BASE64_IMAGE}" \
+&& rm ${TEMPFILE}
 ```
