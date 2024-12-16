@@ -1,57 +1,40 @@
 import asyncio
-import base64
-import tempfile
-from io import BytesIO
-from pathlib import Path
 from collections import ChainMap
+from textwrap import dedent
 
 import sanic
 from sanic.log import logger as log
 
 app = sanic.Sanic("imagePreview")
 
-# https://stackoverflow.com/a/69567335/3356840
-# avifenc --min 0 --max 63 -a end-usage=q -a cq-level=18 -a tune=ssim
-# avifenc --min 30 --max 63 --speed 10 --yuv 420 -d 8 --codec aom input.png output.avif
 
-
-async def cmd(*args, hide_output=False):
-    args = tuple(map(str,args))
-    log.debug(' '.join(args))
-    proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE if hide_output else None,
-        stderr=asyncio.subprocess.PIPE if hide_output else None,
+async def shell(cmd):
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout = asyncio.subprocess.PIPE,
+        stderr = asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await proc.communicate()
+    return await proc.communicate()  # stdout, stderr
 
 
 async def image_url_to_avif_base64(url):
-    with tempfile.TemporaryDirectory() as tempdir:
-        tempdir = Path(tempdir)
-
-        # Download image input
-        file_input = tempdir.joinpath("in")
-        await cmd("wget", url, "-O", file_input.absolute())
-        assert file_input.exists(), f"${file_input.absolute()} should have been created"
-
-        # Convert to avif
-        file_output = tempdir.joinpath("out.avif")
-        await cmd(
-            "avifenc",
-            file_input.absolute(),
-            file_output.absolute(),
-            "--min","63",
-            "--max","63",
-        )
-        assert file_output.exists(), f"${file_output.absolute()} should have been created"
-
-        # Base64 encode
-        buffer = BytesIO()
-        buffer.write(b"data:image/avif;base64,")
-        with file_output.open("rb") as out:
-            base64.encode(out, buffer)
-        return buffer.getvalue()
+    stdout, _ = await shell(dedent(r"""
+        URL_IMAGE="__URL__" && \
+        TEMPFILE=$(mktemp --suffix=.avif) && \
+        BASE64_IMAGE=$( \
+            wget -q "${URL_IMAGE}" -O - \
+            | ffmpeg \
+                -hide_banner -loglevel error \
+                -i - \
+                -c:v libaom-av1 -filter:v scale=200:-2 -crf 45 -pix_fmt yuv420p \
+                -y ${TEMPFILE} \
+            && cat ${TEMPFILE} \
+            | base64 \
+        ) \
+        && echo "data:image/avif;base64,${BASE64_IMAGE}" \
+        && rm ${TEMPFILE}
+    """.replace('__URL__', url)))
+    return stdout
 
 
 @app.route("/", methods=["GET", "POST"])

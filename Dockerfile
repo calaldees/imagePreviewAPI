@@ -1,10 +1,14 @@
 FROM python:alpine
 
 RUN apk add --no-cache \
-    libavif-apps \
-    base64 \
+    ffmpeg \
+    coreutils \
     wget \
 && true
+# libavif-apps \
+# base64 \ and  mktemp #part of coreutils
+# chmod 777 /tmp/  # ??
+
 
 WORKDIR /app/
 
