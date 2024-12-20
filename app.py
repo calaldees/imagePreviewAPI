@@ -34,11 +34,12 @@ async def image_url_to_avif_base64(url):
         && echo "data:image/avif;base64,${BASE64_IMAGE}" \
         && rm ${TEMPFILE}
     """.replace('__URL__', url)))
-    return stdout
+    return stdout.replace(b'\n', b'')
 
 
 @app.route("/", methods=["GET", "POST"])
 async def root(request):
-    url = ChainMap(request.args, request.json).get("url", "")
+    url = ChainMap(request.args or {}, request.json or {}).get("url", "")
+    # TODO: Take binary image from upload/POST?
     log.info(url)
     return sanic.response.raw(await image_url_to_avif_base64(url), content_type="text/plain")
