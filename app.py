@@ -17,7 +17,9 @@ async def shell(cmd):
     return await proc.communicate()  # stdout, stderr
 
 
-async def image_url_to_avif_base64(url):
+type Url = str
+
+async def image_url_to_avif_base64(url: Url, width: int=200) -> bytes:
     stdout, _ = await shell(dedent(r"""
         URL_IMAGE="__URL__" && \
         TEMPFILE=$(mktemp --suffix=.avif) && \
@@ -26,20 +28,21 @@ async def image_url_to_avif_base64(url):
             | ffmpeg \
                 -hide_banner -loglevel error \
                 -i - \
-                -c:v libaom-av1 -filter:v scale=200:-2 -crf 45 -pix_fmt yuv420p \
+                -c:v libaom-av1 -filter:v scale=__IMAGE_WIDTH__:-2 -crf 45 -pix_fmt yuv420p \
                 -y ${TEMPFILE} \
             && cat ${TEMPFILE} \
             | base64 \
         ) \
         && echo "data:image/avif;base64,${BASE64_IMAGE}" \
         && rm ${TEMPFILE}
-    """.replace('__URL__', url)))
+    """.replace('__URL__', url).replace('__IMAGE_WIDTH__', str(width))))
     return stdout.replace(b'\n', b'')
 
 
 @app.route("/", methods=["GET", "POST"])
 async def root(request):
-    url = ChainMap(request.args or {}, request.json or {}).get("url", "")
+    kwargs = ChainMap(request.args or {}, request.json or {})
+    url = kwargs.get("url", "")
     # TODO: Take binary image from upload/POST?
     log.info(url)
     return sanic.response.raw(await image_url_to_avif_base64(url), content_type="text/plain")
