@@ -42,7 +42,6 @@ async def image_url_to_avif_base64(url: Url, width: int=200) -> bytes:
 @app.route("/", methods=["GET", "POST"])
 async def root(request):
     kwargs = ChainMap({k:request.args.get(k) for k in request.args.keys()} or {}, request.json or {})
-    url = kwargs.get("url", "")
     # TODO: Take binary image from upload/POST?
-    log.info(url)
-    return sanic.response.raw(await image_url_to_avif_base64(url), content_type="text/plain")
+    log.info(kwargs)
+    return sanic.response.raw(await image_url_to_avif_base64(**kwargs), content_type="text/plain")
