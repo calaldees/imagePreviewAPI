@@ -76,3 +76,9 @@ BASE64_IMAGE=$( \
 && echo "data:image/avif;base64,${BASE64_IMAGE}" \
 && rm ${TEMPFILE}
 ```
+
+
+Considered: Neither work
+ `Content-Transfer-Encoding: base64`
+ `Content-Type: application/pdf+base64`
+https://stackoverflow.com/a/68366520/3356840

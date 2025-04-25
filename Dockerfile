@@ -19,4 +19,4 @@ ENV PYTHONPATH=/site-packages
 COPY . .
 
 # python3 -m sanic --host 0.0.0.0 --single-process app --debug
-CMD ["python3", "-m", "sanic", "--host", "0.0.0.0", "--single-process", "app", "--debug"]
+CMD ["python3", "-m", "sanic", "--host", "0.0.0.0", "app", "--single-process", "--debug"]
