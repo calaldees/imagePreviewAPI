@@ -1,4 +1,5 @@
 import asyncio
+from types import MappingProxyType
 from collections import ChainMap
 from textwrap import dedent
 
@@ -19,7 +20,11 @@ async def shell(cmd):
 
 type Url = str
 
-async def image_url_to_avif_base64(url: Url, width: int=200) -> bytes:
+FORMAT_LOOKUP_ENCODER = MappingProxyType({
+    'avif': 'libaom-av1',
+})
+
+async def image_url_to_avif_base64(url: Url, width: int=-1, crf=45, format='avif') -> bytes:
     stdout, _ = await shell(dedent(r"""
         URL_IMAGE="__URL__" && \
         TEMPFILE=$(mktemp --suffix=.avif) && \
@@ -28,14 +33,23 @@ async def image_url_to_avif_base64(url: Url, width: int=200) -> bytes:
             | ffmpeg \
                 -hide_banner -loglevel error \
                 -i - \
-                -c:v libaom-av1 -filter:v scale=__IMAGE_WIDTH__:-2 -crf 45 -pix_fmt yuv420p \
+                -c:v __ENCODER__ \
+                -filter:v scale=__IMAGE_WIDTH__:-2 \
+                -crf __CRF__ \
+                -pix_fmt yuv420p \
                 -y ${TEMPFILE} \
             && cat ${TEMPFILE} \
             | base64 \
         ) \
-        && echo "data:image/avif;base64,${BASE64_IMAGE}" \
+        && echo "data:image/__FORMAT__;base64,${BASE64_IMAGE}" \
         && rm ${TEMPFILE}
-    """.replace('__URL__', url).replace('__IMAGE_WIDTH__', str(width))))
+    """
+        .replace('__URL__', url)
+        .replace('__IMAGE_WIDTH__', str(width))
+        .replace('__CRF__', str(crf))
+        .replace('__FORMAT__', format)
+        .replace('__ENCODER__', FORMAT_LOOKUP_ENCODER[format])
+    ))
     return stdout.replace(b'\n', b'')
 
 
